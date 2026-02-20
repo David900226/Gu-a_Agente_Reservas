@@ -1,0 +1,1709 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guía – Agente de Reservas en n8n + VAPI</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #161921;
+    --card: #1c2030;
+    --border: #262d3f;
+    --accent: #5b8cff;
+    --accent2: #38e8c5;
+    --warn: #ff9f43;
+    --text: #e2e8f0;
+    --muted: #6b7a99;
+    --done: #2dd4bf;
+    --radius: 14px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  /* Noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative;
+    padding: 60px 24px 40px;
+    text-align: center;
+    overflow: hidden;
+  }
+
+  header::before {
+    content: '';
+    position: absolute;
+    top: -80px; left: 50%; transform: translateX(-50%);
+    width: 600px; height: 300px;
+    background: radial-gradient(ellipse, rgba(91,140,255,0.18) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(91,140,255,0.35);
+    padding: 4px 14px;
+    border-radius: 100px;
+    margin-bottom: 20px;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #fff 0%, #8ba8ff 60%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-weight: 300;
+    max-width: 520px;
+    margin: 0 auto 36px;
+  }
+
+  /* ── PROGRESS BAR ── */
+  .progress-wrap {
+    max-width: 700px;
+    margin: 0 auto 16px;
+    padding: 0 24px;
+  }
+
+  .progress-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 13px;
+  }
+
+  .progress-label {
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+  }
+
+  .progress-pct {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    color: var(--accent2);
+  }
+
+  .progress-bar-bg {
+    height: 6px;
+    background: var(--border);
+    border-radius: 100px;
+    overflow: hidden;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 100px;
+    transition: width 0.5s cubic-bezier(.4,0,.2,1);
+    width: 0%;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  main {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── PHASE HEADER ── */
+  .phase {
+    margin: 40px 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .phase-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .phase h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .phase-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Phase colors */
+  .phase-skool .phase-dot { background: #a78bfa; }
+  .phase-n8n .phase-dot { background: var(--accent); }
+  .phase-vapi .phase-dot { background: var(--accent2); }
+  .phase-tools .phase-dot { background: var(--warn); }
+  .phase-sheets .phase-dot { background: #fb7185; }
+
+  /* ── STEP CARD ── */
+  .step-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .step-card.completed {
+    border-color: rgba(45,212,191,0.35);
+    background: rgba(45,212,191,0.04);
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+  }
+
+  .step-header:hover {
+    background: rgba(255,255,255,0.02);
+  }
+
+  /* Checkbox */
+  .check-box {
+    width: 22px; height: 22px;
+    border: 2px solid var(--border);
+    border-radius: 6px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.25s;
+    cursor: pointer;
+  }
+
+  .check-box.checked {
+    background: var(--done);
+    border-color: var(--done);
+  }
+
+  .check-box svg { display: none; }
+  .check-box.checked svg { display: block; }
+
+  .step-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    flex-shrink: 0;
+    min-width: 28px;
+  }
+
+  .step-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 15px;
+    flex: 1;
+    transition: color 0.3s;
+  }
+
+  .completed .step-title { color: var(--done); }
+
+  .chevron {
+    color: var(--muted);
+    flex-shrink: 0;
+    transition: transform 0.3s;
+  }
+
+  .step-card.open .chevron { transform: rotate(180deg); }
+
+  /* Step body */
+  .step-body {
+    display: none;
+    padding: 0 20px 20px 64px;
+    animation: fadeIn 0.25s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .step-card.open .step-body { display: block; }
+
+  .step-body p {
+    color: #b0bcd4;
+    font-size: 14px;
+    margin-bottom: 10px;
+  }
+
+  .step-body ul {
+    list-style: none;
+    margin: 10px 0;
+  }
+
+  .step-body ul li {
+    font-size: 14px;
+    color: #b0bcd4;
+    padding: 4px 0 4px 20px;
+    position: relative;
+  }
+
+  .step-body ul li::before {
+    content: '›';
+    position: absolute;
+    left: 4px;
+    color: var(--accent);
+    font-weight: bold;
+  }
+
+  /* Code/field highlight */
+  code {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    background: rgba(91,140,255,0.12);
+    color: var(--accent);
+    border: 1px solid rgba(91,140,255,0.2);
+    border-radius: 5px;
+    padding: 2px 7px;
+  }
+
+  /* Tip box */
+  .tip {
+    background: rgba(255,159,67,0.08);
+    border: 1px solid rgba(255,159,67,0.25);
+    border-left: 3px solid var(--warn);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    color: #d4a96a;
+    margin-top: 12px;
+  }
+
+  .tip strong { color: var(--warn); }
+
+  /* ── DONE BANNER ── */
+  #done-banner {
+    display: none;
+    background: linear-gradient(135deg, rgba(45,212,191,0.12), rgba(91,140,255,0.12));
+    border: 1px solid rgba(45,212,191,0.4);
+    border-radius: var(--radius);
+    padding: 32px 24px;
+    text-align: center;
+    margin-top: 32px;
+    animation: fadeIn 0.5s ease;
+  }
+
+  #done-banner .emoji { font-size: 40px; margin-bottom: 12px; }
+  #done-banner h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent2);
+    margin-bottom: 8px;
+  }
+  #done-banner p { color: var(--muted); font-size: 14px; }
+
+  /* ── RESET BUTTON ── */
+  .reset-btn {
+    display: block;
+    margin: 24px auto 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    padding: 8px 20px;
+    border-radius: 100px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+
+  .reset-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 100px; }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="badge">Guía Interactiva · Skool Premium</div>
+  <h1>Agente de Reservas<br>con n8n + VAPI</h1>
+  <p class="subtitle">Sigue cada paso en orden. Marca la casilla cuando termines y avanza al siguiente. ¡Tú puedes!</p>
+</header>
+
+<div class="progress-wrap">
+  <div class="progress-header">
+    <span class="progress-label">Progreso general</span>
+    <span class="progress-pct" id="pct">0%</span>
+  </div>
+  <div class="progress-bar-bg">
+    <div class="progress-bar-fill" id="bar"></div>
+  </div>
+</div>
+
+<main id="steps-container">
+
+  <!-- ═══ FASE 1: SKOOL + N8N BASE ═══ -->
+  <div class="phase phase-skool">
+    <div class="phase-dot"></div>
+    <h2>Fase 1 — Descargar e importar el flujo base</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="1">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">01</span>
+      <span class="step-title">Entrar a Skool y descargar el flujo padre</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Entra a la <strong>comunidad premium en Skool</strong>. Una vez adentro:</p>
+      <ul>
+        <li>Ve a <code>Classroom</code> → módulo <strong>Agente Reservas</strong></li>
+        <li>Busca la sección <strong>Plantilla Base</strong></li>
+        <li>En <code>Resources</code> descarga el archivo llamado <strong>"Flujo padre – Reservas MCP"</strong></li>
+      </ul>
+      <div class="tip"><strong>💡 Tip:</strong> Guarda el archivo en un lugar fácil de encontrar, como el Escritorio, para importarlo en el siguiente paso.</div>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="2">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">02</span>
+      <span class="step-title">Importar y activar el flujo en n8n</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Ahora importamos el flujo descargado a n8n:</p>
+      <ul>
+        <li>Abre <strong>n8n</strong> y crea un <code>Workflow nuevo</code> (lienzo vacío)</li>
+        <li>Importa el archivo que descargaste (botón <code>Import from file</code>)</li>
+        <li>Una vez abierto, haz clic en <code>Save</code> para guardarlo</li>
+        <li>Actívalo: cambia el estado de <strong>Inactivo → Activo</strong></li>
+      </ul>
+      <div class="tip"><strong>⚠️ Importante:</strong> Si no activas el flujo, el agente no funcionará cuando reciba llamadas.</div>
+    </div>
+  </div>
+
+  <!-- ═══ FASE 2: VAPI - CREAR ASISTENTE ═══ -->
+  <div class="phase phase-vapi">
+    <div class="phase-dot"></div>
+    <h2>Fase 2 — Crear el asistente en VAPI</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="3">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">03</span>
+      <span class="step-title">Registrarse y crear el asistente base en VAPI</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>VAPI es la plataforma que le da <strong>voz</strong> a tu agente. Si no tienes cuenta, regístrate primero.</p>
+      <ul>
+        <li>Entra a <strong>VAPI</strong> y ve al menú izquierdo → <code>Assistant</code></li>
+        <li>Haz clic en <code>Create Assistant</code></li>
+        <li>En <strong>Assistant Name</strong> escribe: <code>Agente recepcionista</code> o <code>Agente de reservas</code></li>
+        <li>Selecciona <code>Blank Template</code> y haz clic en <code>Create Assistant</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="4">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">04</span>
+      <span class="step-title">Generar el First Message y System Prompt</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Estos textos definen el <strong>saludo inicial</strong> y la <strong>personalidad</strong> del agente. Los generamos con un flujo especial en n8n.</p>
+      <ul>
+        <li>Ve a Skool → módulo <strong>Generador First System Prompt</strong> → <code>Resources</code> → descarga el flujo</li>
+        <li>En n8n, crea un workflow nuevo e importa ese archivo</li>
+        <li>Haz clic en <code>Execute Workflow</code>: aparecerá un formulario</li>
+        <li>Llena los datos: nombre del agente, negocio, tipo, ciudad, país, zona horaria</li>
+        <li>Zona horaria Colombia: <code>America/Bogota</code> (búscala en Skool → <em>Zonas Horarias – Guía Rápida</em>)</li>
+        <li>Escribe el horario <strong>en palabras</strong>: ej. "Atendemos de lunes a viernes de ocho de la mañana a seis de la tarde"</li>
+        <li>Lista los servicios separados por comas</li>
+        <li>Escribe los profesionales en texto claro: ej. "doctor Juan Lozano, doctora Luisa Murillo"</li>
+        <li>Haz clic en <code>Submit</code> y espera a que los nodos se pongan en <strong>verde</strong></li>
+        <li>Abre el nodo <code>Datos</code> con doble clic y descarga los dos archivos <code>.txt</code>: First Message y System Prompt</li>
+      </ul>
+      <div class="tip"><strong>💡 Tip:</strong> Si no sabes tu zona horaria exacta, entra a Skool → "Zonas Horarias – Guía Rápida" y cópiala tal cual.</div>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="5">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">05</span>
+      <span class="step-title">Pegar el First Message y System Prompt en VAPI</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Ahora cargamos los textos generados en el asistente de VAPI:</p>
+      <ul>
+        <li>En VAPI, abre tu asistente → haz clic en <code>Query Assistant</code></li>
+        <li>Ve a la sección <code>Model</code> en el panel superior</li>
+        <li>Abre el archivo <code>First Message.txt</code>, copia el contenido y pégalo en el campo <strong>First Message</strong></li>
+        <li>Abre el archivo <code>System Prompt.txt</code>, copia el contenido y pégalo en <strong>System Prompt</strong></li>
+        <li>Arriba, haz clic en <code>Published</code> → selecciona <code>Skip and Publish</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ FASE 3: VOZ Y TRANSCRIPCIÓN ═══ -->
+  <div class="phase phase-n8n">
+    <div class="phase-dot"></div>
+    <h2>Fase 3 — Configurar Voz y Transcripción</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="6">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">06</span>
+      <span class="step-title">Configurar la voz del agente</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Le vamos a dar una voz en español a tu agente:</p>
+      <ul>
+        <li>En VAPI, selecciona la pestaña <code>Voice</code> en el menú superior</li>
+        <li>En <strong>Voice Configuration</strong> → <code>Provider</code>: selecciona <strong>VAPI</strong></li>
+        <li>Activa la opción <code>Add Voice ID manually</code></li>
+        <li>Busca en Google la <strong>plataforma de voces</strong> → entra a la página oficial</li>
+        <li>En el menú izquierdo → <code>Voces</code> → filtra por idioma → <code>Spanish</code></li>
+        <li>Encuentra una voz que te guste → haz clic en los tres puntos → <code>Copiar ID de voz</code></li>
+        <li>Regresa a VAPI y pega el ID en <code>Custom Voice ID</code></li>
+      </ul>
+      <div class="tip"><strong>💡 Tip:</strong> Escucha varias voces antes de elegir. La voz de tu agente es lo primero que escuchará tu cliente.</div>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="7">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">07</span>
+      <span class="step-title">Configurar el Transcriber (reconocimiento de voz)</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>El transcriber convierte lo que dice el cliente en texto. Configúralo así:</p>
+      <ul>
+        <li>Ve a <code>Transcriber</code> (al lado de Voice)</li>
+        <li><code>Provider</code>: <strong>Deepgram</strong></li>
+        <li><code>Model</code>: <strong>Nova 3</strong></li>
+        <li><code>Language</code>: <strong>Spanish</strong></li>
+        <li>Activa <code>Background Noising Enable</code></li>
+        <li><code>Confidence Threshold</code>: <strong>0.4</strong></li>
+        <li>Activa <code>Use numerals</code> (mejora captura de teléfonos, horas, números)</li>
+      </ul>
+      <div class="tip"><strong>💡 Tip:</strong> "Use numerals" es clave para que el agente capture bien los teléfonos de los clientes.</div>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="8">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">08</span>
+      <span class="step-title">Agregar KeyTerms y configurar el FallBack Transcriber</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Los <strong>KeyTerms</strong> ayudan al agente a entender correos electrónicos correctamente:</p>
+      <ul>
+        <li>Ve a Skool → módulo <strong>KeyTerms</strong> → copia la lista completa (incluye <code>@</code>, <code>.</code>, dominios, etc.)</li>
+        <li>Regresa a VAPI → pega la lista en la sección <code>KeyTerms</code></li>
+        <li>Baja a <code>FallBack Transcriber</code>:</li>
+        <li>&nbsp;&nbsp;• <code>Provider</code>: <strong>Google</strong></li>
+        <li>&nbsp;&nbsp;• <code>Language</code>: <strong>Spanish</strong></li>
+        <li>&nbsp;&nbsp;• <code>Model</code>: <strong>Gemini 2.0 Flash</strong></li>
+        <li>Haz clic en <code>Published</code> → <code>Skip and Publish</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ FASE 4: HERRAMIENTA MCP ═══ -->
+  <div class="phase phase-tools">
+    <div class="phase-dot"></div>
+    <h2>Fase 4 — Conectar VAPI con n8n (Herramienta MCP)</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="9">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">09</span>
+      <span class="step-title">Crear la herramienta MCP en VAPI</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Esta herramienta es el <strong>puente</strong> entre VAPI y n8n. Sin ella, el agente no puede ejecutar acciones.</p>
+      <ul>
+        <li>En VAPI, ve a <code>Tools</code> en el menú izquierdo → <code>Create Tool</code> → selecciona <strong>MCP</strong></li>
+        <li>Ve a Skool → módulo <strong>Tool MCP – VAPI</strong> → copia el <code>Tool Name</code>: <strong>n8n</strong> → pégalo en VAPI</li>
+        <li>Copia la <code>Description</code> de Skool → pégala en VAPI en el campo Description</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="10">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">10</span>
+      <span class="step-title">Conectar la URL de n8n y agregar la API Key</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Ahora le decimos a VAPI <strong>a qué URL</strong> debe llamar en n8n:</p>
+      <ul>
+        <li>En n8n, abre el flujo padre → doble clic en el nodo <strong>Agente recepcionista</strong></li>
+        <li>Selecciona <code>Production URL</code> → copia la URL (empieza por <code>https://</code>)</li>
+        <li>En VAPI → <code>Server Settings</code> → pega en el campo <strong>Server URL</strong></li>
+        <li>Haz clic en <code>Add Header</code> → en HTTP Headers escribe: <code>authorization</code></li>
+        <li>En n8n → entra al menú izquierdo → ícono de engranaje → <code>n8n API</code></li>
+        <li>Crea una API Key nueva (ponle nombre, elige expiración) → cópiala</li>
+        <li>En VAPI, en el campo del valor del header, escribe: <code>Bearer </code> (con espacio) + pega la API Key</li>
+        <li>En <code>MCP Settings</code> selecciona <code>Server-Sent Events</code></li>
+        <li>Haz clic en <code>Save</code></li>
+      </ul>
+      <div class="tip"><strong>⚠️ Importante:</strong> Recuerda el espacio entre "Bearer" y la API Key. Sin ese espacio, la conexión fallará.</div>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="11">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">11</span>
+      <span class="step-title">Asignar la herramienta al asistente y configurar End Call</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>En VAPI → menú → <code>Assistant</code> → abre tu asistente</li>
+        <li>Ve a <code>Tools</code> en el menú superior → despliega la lista → selecciona <strong>n8n</strong></li>
+        <li>Haz clic en <code>Publish</code> → <code>Skip and Publish</code></li>
+        <li>En <code>Predefined Functions</code> activa <strong>Enable End Call Function</strong> (para que el agente cuelgue cuando el cliente termina)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ FASE 5: CONFIGURACIÓN AVANZADA ═══ -->
+  <div class="phase phase-n8n">
+    <div class="phase-dot"></div>
+    <h2>Fase 5 — Ajustes Avanzados del Agente</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="12">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">12</span>
+      <span class="step-title">Configurar Advanced: Start, Stop Speaking y Messaging</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Estos ajustes controlan <strong>cómo habla y escucha</strong> el agente durante la llamada:</p>
+      <ul>
+        <li>Ve a <code>Advanced</code> en el menú superior</li>
+        <li><strong>Start Speaking Plan</strong>: <code>Wait Seconds</code> → <strong>0.7</strong> | <code>Smart Endpoint</code> → <strong>VAPI</strong></li>
+        <li><strong>Stop Speaking Plan</strong>: <code>Number of Words</code> → <strong>5</strong> | <code>Voice Seconds</code> → <strong>0.4</strong> | <code>Backoff Seconds</code> → <strong>2</strong></li>
+        <li><strong>Messaging → Client Message</strong>: activa solo <code>Tool Calls</code> (desactiva todo lo demás)</li>
+        <li><strong>Messaging → Server Message</strong>: activa solo <code>Tool Calls</code></li>
+        <li><strong>End Call Message</strong>: escribe un cierre humano, ej: "Fue un placer atenderte. Que tengas un feliz día."</li>
+        <li>Haz clic en <code>Publish</code> → <code>Skip and Publish</code></li>
+      </ul>
+      <div class="tip"><strong>💡 Tip:</strong> Un cierre cálido y natural mejora mucho la experiencia de tus clientes.</div>
+    </div>
+  </div>
+
+  <!-- ═══ FASE 6: FLUJOS HIJOS ═══ -->
+  <div class="phase phase-sheets">
+    <div class="phase-dot"></div>
+    <h2>Fase 6 — Flujos hijos y Google Sheets</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="13">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">13</span>
+      <span class="step-title">Descargar e importar el flujo hijo "Buscar cliente"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>Ve a Skool → módulo <strong>Flujos hijos</strong> → <code>Resources</code> → descarga <strong>Buscar cliente</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo con <code>Import from file</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="14">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">14</span>
+      <span class="step-title">Crear la base de datos CRM en Google Sheets</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Esta hoja de cálculo será la <strong>base de datos</strong> donde se guardan los clientes y citas:</p>
+      <ul>
+        <li>Ve a Skool → módulo <strong>Plantilla Google Sheets</strong> → descarga el archivo <strong>CRM</strong></li>
+        <li>Abre <strong>Google Sheets</strong> → <code>Archivo</code> → <code>Abrir</code> → pestaña <code>Subir</code> → selecciona el archivo CRM descargado</li>
+        <li>El documento se llama <strong>CRM</strong> y tiene dos pestañas:
+          <ul style="margin-left:16px; margin-top:6px;">
+            <li>📋 <code>Clientes</code>: columnas email, nombre, teléfono</li>
+            <li>📅 <code>Registro de citas</code>: guarda agendamientos, reprogramaciones y cancelaciones</li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="15">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">15</span>
+      <span class="step-title">Conectar Google Sheets con n8n</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Ahora conectamos el nodo de Google Sheets en n8n con tu hoja CRM:</p>
+      <ul>
+        <li>En n8n, abre el flujo <strong>Buscar cliente</strong> → doble clic en el nodo <code>Google Sheets</code></li>
+        <li>En <code>Credentials to connect with</code> → <code>Create new credentials</code></li>
+        <li>Confirma que esté en <code>OAuth2</code> → haz clic en <code>Sign in with Google</code></li>
+        <li>Selecciona tu correo → acepta los permisos → haz clic en Continuar → cierra la ventana cuando diga "conexión exitosa"</li>
+        <li>En <code>Document</code>: selecciona el documento <strong>CRM</strong></li>
+        <li>En <code>Sheet</code>: selecciona la pestaña <strong>Clientes</strong></li>
+      </ul>
+
+      <div style="background:rgba(251,113,133,0.08);border:1px solid rgba(251,113,133,0.3);border-left:3px solid #fb7185;border-radius:8px;padding:14px 16px;margin-top:14px;">
+        <p style="color:#fb7185;font-weight:600;font-family:'Syne',sans-serif;font-size:13px;margin-bottom:8px;">🚨 Error conocido — "Error fetching options from Google Sheets"</p>
+        <p style="color:#c4a0a8;font-size:13px;margin-bottom:10px;">Es normal que en el campo <strong>Column</strong> (dentro de Filters) aparezca este error. No te preocupes, tiene solución fácil:</p>
+        <ul style="margin:0;">
+          <li style="font-size:13px;color:#c4a0a8;">Elimina el filtro que tiene el error haciendo clic en el ícono de basura o X que aparece al lado</li>
+          <li style="font-size:13px;color:#c4a0a8;">Haz clic en <code>Add Filter</code> para crear uno nuevo</li>
+          <li style="font-size:13px;color:#c4a0a8;">En <strong>Column</strong> selecciona <code>email</code> de la lista desplegable</li>
+          <li style="font-size:13px;color:#c4a0a8;">En <strong>Value</strong> pega exactamente este valor:</li>
+        </ul>
+        <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:7px;padding:10px 14px;margin-top:10px;font-family:'DM Mono',monospace;font-size:13px;color:#38e8c5;letter-spacing:0.3px;user-select:all;">
+          &#123;&#123; $json.email_norm &#125;&#125;
+        </div>
+        <p style="color:#7a8a6a;font-size:12px;margin-top:8px;">💡 Puedes seleccionar y copiar el texto de arriba directamente.</p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══ FASE 7: CONECTAR FLUJOS HIJOS ═══ -->
+  <div class="phase phase-n8n">
+    <div class="phase-dot"></div>
+    <h2>Fase 7 — Conectar flujos hijos al flujo padre</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="16">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">16</span>
+      <span class="step-title">Terminar de configurar el nodo Google Sheets en "Buscar cliente"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Continuando con el flujo <strong>Buscar cliente</strong>, configuramos el filtro correctamente:</p>
+      <ul>
+        <li>Ve a <code>Filters</code> → elimina el filtro que aparece por defecto</li>
+        <li>Haz clic en <code>Add Filter</code></li>
+        <li>En <strong>Column</strong> selecciona <code>email</code></li>
+        <li>En <strong>Value</strong> pega exactamente:</li>
+      </ul>
+      <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:7px;padding:10px 14px;margin:10px 0;font-family:'DM Mono',monospace;font-size:13px;color:#38e8c5;user-select:all;">{{ $json.email_norm }}</div>
+      <ul>
+        <li>Haz clic en <code>Save</code> para guardar el flujo y regresa al flujo padre</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="17">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">17</span>
+      <span class="step-title">Conectar "Buscar cliente" al flujo padre</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>En el <strong>flujo padre</strong>, doble clic en la tool <code>Buscar cliente</code></li>
+        <li>En la sección <code>Workflow</code>, abre la lista y selecciona <strong>Buscar cliente</strong></li>
+        <li>Si aparece dos veces, selecciónalo de nuevo para asegurarte que quede bien enlazado</li>
+        <li>En <code>Workflow Inputs</code> aparecerá el campo <strong>email</strong></li>
+        <li>Si el espacio del valor aparece vacío, haz clic en el ícono de las <strong>tres estrellas ✨</strong></li>
+        <li>Debe quedar con el texto: <code>Defined automatically by the model</code></li>
+      </ul>
+      <div class="tip"><strong>💡 Tip:</strong> Las tres estrellas le indican al agente que asigne ese valor de forma inteligente según el contexto de la llamada.</div>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="18">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">18</span>
+      <span class="step-title">Descargar, importar y configurar el flujo hijo "Nuevo cliente"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>Ve a Skool → módulo <strong>Flujos hijos</strong> → <code>Resources</code> → descarga <strong>Nuevo cliente</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo</li>
+        <li>Abre el nodo <code>Registrar datos</code> (Google Sheets) con doble clic</li>
+        <li>En <code>Credentials</code>: selecciona la misma credencial de Google que usaste antes</li>
+        <li>En <code>Document</code>: selecciona <strong>CRM</strong></li>
+        <li>En <code>Sheet</code>: selecciona <strong>Clientes</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>En <code>Mapping Column Mode</code>: selecciona <strong>Map Each Column Manually</strong></li>
+        <li>Aparecerán tres campos. Pega cada valor exactamente así:</li>
+      </ul>
+
+      <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:8px;overflow:hidden;margin-top:10px;">
+        <div style="display:grid;grid-template-columns:90px 1fr;font-family:'DM Mono',monospace;font-size:12px;">
+          <div style="padding:10px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">email</div>
+          <div style="padding:10px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $json.email_norm }}</div>
+          <div style="padding:10px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">nombre</div>
+          <div style="padding:10px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $json.Nombre }}</div>
+          <div style="padding:10px 14px;background:#1c2030;color:#6b7a99;">teléfono</div>
+          <div style="padding:10px 14px;color:#38e8c5;user-select:all;">{{ $json.Telefono }}</div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:#6b7a99;margin-top:8px;">💡 Selecciona y copia cada valor directamente desde la tabla de arriba.</p>
+
+      <ul style="margin-top:10px;">
+        <li>Cierra el nodo y haz clic en <code>Save</code></li>
+        <li>Asegúrate de que el workflow se llame <strong>Nuevo cliente</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="19">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">19</span>
+      <span class="step-title">Conectar "Nuevo cliente" al flujo padre</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>En el <strong>flujo padre</strong>, doble clic en la tool <code>Nuevo cliente</code></li>
+        <li>En <code>Workflow</code> selecciona <strong>Nuevo cliente</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>Aparecerán los inputs: <strong>email</strong>, <strong>nombre</strong> y <strong>teléfono</strong></li>
+        <li>Si algún campo aparece vacío, haz clic en las <strong>tres estrellas ✨</strong> en cada uno</li>
+        <li>Los tres deben quedar con: <code>Defined automatically by the model</code></li>
+      </ul>
+      <div class="tip"><strong>✅ Listo:</strong> Segundo flujo hijo configurado y conectado. Ahora sigue con <strong>Verificar disponibilidad</strong>.</div>
+    </div>
+  </div>
+
+
+  <!-- ═══ FASE 8: VERIFICAR DISPONIBILIDAD ═══ -->
+  <div class="phase phase-vapi">
+    <div class="phase-dot"></div>
+    <h2>Fase 8 — Flujo hijo: Verificar disponibilidad</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="20">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">20</span>
+      <span class="step-title">Descargar e importar el flujo "Verificar disponibilidad"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>Ve a Skool → módulo <strong>Flujos hijos</strong> → <code>Resources</code> → descarga <strong>Verificar disponibilidad</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo con <code>Import from file</code></li>
+      </ul>
+      <p>En este flujo vas a configurar <strong>tres nodos</strong>: Resolver profesional, Rango horario y Obtener eventos.</p>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="21">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">21</span>
+      <span class="step-title">Crear los calendarios de Google para cada profesional</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Cada profesional necesita su propio calendario en Google Calendar. Así el agente puede revisar disponibilidad por separado.</p>
+      <ul>
+        <li>Abre <strong>Google Calendar</strong> con la cuenta de Gmail que usarás para gestionar las citas</li>
+        <li>Arriba a la derecha → ícono de engranaje ⚙️ → <code>Configuración</code></li>
+        <li>En el menú izquierdo → <code>Agregar calendario</code> → <code>Crear calendario</code></li>
+        <li>Escribe el nombre del profesional, ej: <code>Abogado David Soler</code> → haz clic en <code>Crear calendario</code></li>
+        <li>El calendario aparecerá en el menú izquierdo bajo <strong>Configuración de mis calendarios</strong> → haz clic en él</li>
+        <li>Baja hasta la sección <strong>Integrar calendario</strong></li>
+        <li>Copia el <strong>ID del calendario</strong> (texto largo que termina en <code>@group.calendar.google.com</code>)</li>
+      </ul>
+      <div class="tip"><strong>💡 Tip:</strong> Repite este proceso por cada profesional de tu negocio. Cada uno necesita su propio calendario e ID.</div>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="22">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">22</span>
+      <span class="step-title">Generar el código del nodo "Resolver profesional"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Este nodo es el que conecta cada <strong>profesional</strong> con su <strong>calendario</strong>. El código se genera automáticamente con un flujo especial.</p>
+      <ul>
+        <li>Ve a Skool → módulo <strong>Generador código Resolver profesional</strong> → <code>Resources</code> → descarga el flujo <strong>Generar code Resolver profesional</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo → haz clic en <code>Execute Workflow</code></li>
+        <li>Aparecerá el formulario. Llénalo así:</li>
+      </ul>
+
+      <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:8px;overflow:hidden;margin:10px 0;">
+        <div style="display:grid;grid-template-columns:130px 1fr;font-size:13px;">
+          <div style="padding:10px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Zona horaria</div>
+          <div style="padding:10px 14px;color:#e2e8f0;border-bottom:1px solid #262d3f;">Tu zona horaria, ej: <code>America/Bogota</code></div>
+          <div style="padding:10px 14px;background:#1c2030;color:#6b7a99;">Profesionales</div>
+          <div style="padding:10px 14px;color:#e2e8f0;">Un profesional por línea con este formato:<br>
+            <span style="font-family:'DM Mono',monospace;font-size:12px;color:#38e8c5;">Nombre Profesional | calendarId</span><br>
+            <span style="font-size:12px;color:#6b7a99;">Ejemplo: Abogado David Soler | <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="6b0a09085a59582b0c19041e1b45080a070e050f0a19450c04040c070e45080406">[email&#160;protected]</a></span>
+          </div>
+        </div>
+      </div>
+
+      <ul>
+        <li>Si tienes más profesionales, agrega cada uno en una <strong>línea nueva</strong> con el mismo formato</li>
+        <li>Haz clic en <code>Submit</code> y espera que el flujo termine</li>
+        <li>Abre el nodo <code>Convertir código</code> → descarga el archivo <code>código resolver profesional</code> como <code>.txt</code></li>
+        <li>Ábrelo y <strong>copia todo el contenido</strong></li>
+      </ul>
+      <div class="tip"><strong>💡 Tip:</strong> El ID del calendario lo copiaste en el paso anterior desde Google Calendar → Integrar calendario.</div>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="23">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">23</span>
+      <span class="step-title">Configurar los nodos: Resolver profesional, Rango horario y Obtener eventos</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p><strong>Nodo 1 — Resolver profesional:</strong></p>
+      <ul>
+        <li>Vuelve al flujo <strong>Verificar disponibilidad</strong> → abre el nodo <code>Resolver profesional</code></li>
+        <li>Borra el código que viene por defecto</li>
+        <li>Pega el código que generaste y copiaste en el paso anterior</li>
+        <li>Cierra el nodo</li>
+      </ul>
+
+      <p style="margin-top:14px;"><strong>Nodo 2 — Rango horario:</strong></p>
+      <ul>
+        <li>Abre el nodo <code>Rango horario</code></li>
+        <li>Verás dos campos: <code>Time Min</code> y <code>Time Max</code></li>
+        <li>En el código, busca donde dice <code>setZone</code> → verás <code>"America/Bogota"</code></li>
+        <li>Reemplaza esa zona horaria por la de tu país en <strong>ambos campos</strong> (Time Min y Time Max)</li>
+        <li>No cambies nada más → cierra el nodo</li>
+      </ul>
+      <div class="tip"><strong>💡 Tip:</strong> Si no sabes tu zona horaria exacta, ve a Skool → módulo <strong>Zonas horarias – Guía rápida</strong> y cópiala tal cual.</div>
+
+      <p style="margin-top:14px;"><strong>Nodo 3 — Obtener eventos:</strong></p>
+      <ul>
+        <li>Abre el nodo <code>Obtener eventos</code></li>
+        <li>Ve a <code>Credentials to connect with</code> → <code>Create new credential</code> → <code>Sign in with Google</code></li>
+        <li>Selecciona tu correo → acepta permisos → cierra la ventana cuando diga "conexión exitosa"</li>
+        <li>No toques nada más en este nodo → ciérralo</li>
+      </ul>
+
+      <ul style="margin-top:10px;">
+        <li>Haz clic en <code>Save</code> para guardar el flujo <strong>Verificar disponibilidad</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="24">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">24</span>
+      <span class="step-title">Conectar "Verificar disponibilidad" al flujo padre</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>En el <strong>flujo padre</strong> → doble clic en la tool <code>Verificar disponibilidad</code></li>
+        <li>En <code>Workflow</code> asegúrate de que esté en <code>From List</code> → selecciona <strong>Verificar disponibilidad</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>En <code>Workflow Inputs</code> aparecerán tres parámetros: <strong>Profesional</strong>, <strong>Fecha</strong> y <strong>Hora</strong></li>
+        <li>Haz clic en las <strong>tres estrellas ✨</strong> en cada uno de los tres campos</li>
+        <li>Los tres deben quedar con: <code>Defined automatically by the model</code></li>
+      </ul>
+      <div class="tip"><strong>✅ Listo:</strong> Flujo hijo Verificar disponibilidad conectado. Ahora sigue con <strong>Crear cita</strong>.</div>
+    </div>
+  </div>
+
+
+  <!-- ═══ FASE 9: CREAR CITA ═══ -->
+  <div class="phase phase-tools">
+    <div class="phase-dot"></div>
+    <h2>Fase 9 — Flujo hijo: Crear cita</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="25">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">25</span>
+      <span class="step-title">Descargar e importar el flujo "Crear cita"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>Ve a Skool → módulo <strong>Flujos hijos</strong> → <code>Resources</code> → descarga <strong>Crear cita</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo con <code>Import from file</code></li>
+      </ul>
+      <p>En este flujo configurarás <strong>tres nodos</strong>: Preparar reserva, Crear evento y Registrar info.</p>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="26">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">26</span>
+      <span class="step-title">Generar y pegar el código del nodo "Preparar reserva"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>Este nodo necesita saber qué profesionales y servicios ofrece tu negocio.</p>
+      <ul>
+        <li>Ve a Skool → módulo <strong>Generador código Preparar reserva</strong> → <code>Resources</code> → descarga <strong>Generar code Preparar reserva</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo → haz clic en <code>Execute Workflow</code></li>
+        <li>Llena el formulario con estos datos:</li>
+      </ul>
+
+      <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:8px;overflow:hidden;margin:10px 0;">
+        <div style="display:grid;grid-template-columns:130px 1fr;font-size:13px;">
+          <div style="padding:10px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Zona horaria</div>
+          <div style="padding:10px 14px;color:#e2e8f0;border-bottom:1px solid #262d3f;">Tu zona horaria, ej: <code>America/Bogota</code></div>
+          <div style="padding:10px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Profesionales</div>
+          <div style="padding:10px 14px;color:#e2e8f0;border-bottom:1px solid #262d3f;">Un profesional por línea:<br><span style="font-family:'DM Mono',monospace;font-size:12px;color:#38e8c5;">Nombre Profesional | calendarId</span></div>
+          <div style="padding:10px 14px;background:#1c2030;color:#6b7a99;">Servicios</div>
+          <div style="padding:10px 14px;color:#e2e8f0;">Separados por barra vertical:<br><span style="font-family:'DM Mono',monospace;font-size:12px;color:#38e8c5;">Asesoría | Divorcios | Derecho laboral</span></div>
+        </div>
+      </div>
+
+      <ul>
+        <li>Haz clic en <code>Submit</code> → espera que los nodos queden en verde</li>
+        <li>Abre el nodo <code>Convertir código</code> → descarga el archivo <code>Código preparar reserva</code> como <code>.txt</code></li>
+        <li>Ábrelo y copia todo el contenido</li>
+        <li>Vuelve al flujo <strong>Crear cita</strong> → abre el nodo <code>Preparar reserva</code> → borra el código por defecto → pega el código generado</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="27">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">27</span>
+      <span class="step-title">Configurar los nodos "Crear evento" y "Registrar info"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p><strong>Nodo 2 — Crear evento:</strong></p>
+      <ul>
+        <li>Abre el nodo <code>Crear evento</code> con doble clic</li>
+        <li>En <code>Credentials to connect with</code>: selecciona la credencial de <strong>Google Calendar</strong> que ya creaste antes</li>
+        <li>No toques nada más → cierra el nodo</li>
+      </ul>
+
+      <p style="margin-top:14px;"><strong>Nodo 3 — Registrar info:</strong></p>
+      <ul>
+        <li>Abre el nodo <code>Registrar info</code> con doble clic</li>
+        <li>Selecciona la credencial de <strong>Google Sheets</strong> que ya creaste antes</li>
+        <li>En <code>Document</code>: selecciona <strong>CRM</strong></li>
+        <li>En <code>Sheet</code>: selecciona <strong>Registro de citas</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>En <code>Mapping Column Mode</code>: selecciona <strong>Map each column manually</strong></li>
+        <li>Aparecerán 8 campos. Pega cada valor exactamente así:</li>
+      </ul>
+
+      <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:8px;overflow:hidden;margin:10px 0;">
+        <div style="display:grid;grid-template-columns:140px 1fr;font-family:'DM Mono',monospace;font-size:11.5px;">
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">ID</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{$node["Crear Evento"].json["id"]}}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Nombre</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $('Preparar Reserva').item.json.nombre }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Email</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $('Preparar Reserva').item.json.email_normalizado }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Tipo de servicio</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $('Preparar Reserva').item.json.servicio_normalizado }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Fecha cita</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $('Preparar Reserva').item.json.fecha_cita_ddmmyyyy }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Hora</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $('Preparar Reserva').item.json.Hora }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Profesional</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $('Preparar Reserva').item.json.profesional_nombre }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;">Estado</div>
+          <div style="padding:9px 14px;color:#38e8c5;user-select:all;">{{ $('Preparar Reserva').item.json.estado }}</div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:#6b7a99;margin-top:6px;">💡 Selecciona y copia cada valor directamente desde la tabla.</p>
+
+      <ul style="margin-top:10px;">
+        <li>Cierra el nodo → haz clic en <code>Save</code></li>
+        <li>Asegúrate de que el workflow se llame <strong>Crear cita</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="28">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">28</span>
+      <span class="step-title">Conectar "Crear cita" al flujo padre</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>En el <strong>flujo padre</strong> → doble clic en la tool <code>Crear cita</code></li>
+        <li>En <code>Workflow</code> selecciona <strong>Crear cita</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>Aparecerán los inputs: <strong>StartTime, EndTime, Email, Event Summary, Nombre, Notas, Hora y Profesional</strong></li>
+        <li>Haz clic en las <strong>tres estrellas ✨</strong> en cada campo → todos deben quedar con <code>Defined automatically by the model</code></li>
+      </ul>
+      <div class="tip"><strong>✅ Listo:</strong> Flujo hijo Crear cita conectado. Ahora sigue con <strong>Buscar cita</strong>.</div>
+    </div>
+  </div>
+
+  <!-- ═══ FASE 10: BUSCAR CITA ═══ -->
+  <div class="phase phase-sheets">
+    <div class="phase-dot"></div>
+    <h2>Fase 10 — Flujo hijo: Buscar cita</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="29">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">29</span>
+      <span class="step-title">Descargar, importar y generar el código de "Buscar cita"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>Ve a Skool → módulo <strong>Flujos hijos</strong> → <code>Resources</code> → descarga <strong>Buscar cita</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo</li>
+      </ul>
+      <p style="margin-top:10px;">Ahora genera el código para el nodo <code>Preparar búsqueda</code>:</p>
+      <ul>
+        <li>Ve a Skool → módulo <strong>Generador código Preparar búsqueda</strong> → descarga <strong>Generar code Preparar búsqueda</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo → haz clic en <code>Execute Workflow</code></li>
+        <li>Llena el formulario: zona horaria + profesionales con el formato <span style="font-family:'DM Mono',monospace;font-size:12px;color:#38e8c5;">Nombre | calendarId</span></li>
+        <li>Haz clic en <code>Submit</code> → espera los nodos en verde</li>
+        <li>Abre el nodo <code>Convertir código</code> → descarga <code>Código preparar búsqueda</code> como <code>.txt</code> → copia todo el contenido</li>
+        <li>Vuelve al flujo <strong>Buscar cita</strong> → abre el nodo <code>Preparar búsqueda</code> → borra el código por defecto → pega el código generado</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="30">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">30</span>
+      <span class="step-title">Configurar el nodo "Get many events" y guardar el flujo</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>Abre el nodo <code>Get many events</code> con doble clic</li>
+        <li>En <code>Credentials to connect with</code>: selecciona la credencial de <strong>Google Calendar</strong> que ya creaste antes</li>
+        <li>No toques nada más → cierra el nodo</li>
+        <li>Haz clic en <code>Save</code> para guardar el flujo <strong>Buscar cita</strong></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="31">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">31</span>
+      <span class="step-title">Conectar "Buscar cita" al flujo padre con sus JSON especiales</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>En el <strong>flujo padre</strong> → doble clic en la tool <code>Buscar cita</code></li>
+        <li>En <code>Workflow</code> selecciona <strong>Buscar cita</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>Aparecerán 4 inputs. Pega cada valor así:</li>
+      </ul>
+
+      <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:8px;overflow:hidden;margin:10px 0;">
+        <div style="display:grid;grid-template-columns:110px 1fr;font-family:'DM Mono',monospace;font-size:11.5px;">
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">AfterTime</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ String($now.setZone('America/Bogota').startOf('day').toISO()).trim() }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">BeforeTime</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ String($now.setZone('America/Bogota').plus({ days: 90 }).endOf('day').toISO()).trim() }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Email</div>
+          <div style="padding:9px 14px;color:#a78bfa;border-bottom:1px solid #262d3f;">✨ Clic en las tres estrellas → <span style="color:#38e8c5;">Defined automatically by the model</span></div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;">Profesional</div>
+          <div style="padding:9px 14px;color:#38e8c5;user-select:all;">{{ '' }}</div>
+        </div>
+      </div>
+      <p style="font-size:12px;color:#6b7a99;margin-top:6px;">💡 Selecciona y copia cada valor directamente desde la tabla. En AfterTime y BeforeTime recuerda cambiar <code>America/Bogota</code> por tu zona horaria si es diferente.</p>
+      <div class="tip"><strong>✅ Listo:</strong> Flujo hijo Buscar cita conectado al flujo padre.</div>
+    </div>
+  </div>
+
+
+  <!-- ═══ FASE 11: REPROGRAMAR CITA ═══ -->
+  <div class="phase phase-skool">
+    <div class="phase-dot"></div>
+    <h2>Fase 11 — Flujo hijo: Reprogramar cita</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="32">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">32</span>
+      <span class="step-title">Descargar e importar el flujo "Reprogramar cita"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>Ve a Skool → módulo <strong>Flujos hijos</strong> → <code>Resources</code> → descarga <strong>Reprogramar cita</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo con <code>Import from file</code></li>
+      </ul>
+      <p>En este flujo configurarás <strong>tres nodos</strong>: Update an event, Organizar info y Registrar datos.</p>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="33">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">33</span>
+      <span class="step-title">Configurar el nodo "Update an event" y generar el código de "Organizar info"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p><strong>Nodo 1 — Update an event:</strong></p>
+      <ul>
+        <li>Abre el nodo <code>Update an event</code> con doble clic</li>
+        <li>En <code>Credentials to connect with</code>: selecciona la credencial de <strong>Google Calendar</strong> ya creada</li>
+        <li>No toques nada más → cierra el nodo</li>
+      </ul>
+
+      <p style="margin-top:14px;"><strong>Nodo 2 — Organizar info (generar código):</strong></p>
+      <ul>
+        <li>Ve a Skool → módulo <strong>Generador código Organizar info</strong> → <code>Resources</code> → descarga el flujo generador</li>
+        <li>En n8n → crea un workflow nuevo → impórtalo → haz clic en <code>Execute Workflow</code></li>
+        <li>Llena el formulario:</li>
+      </ul>
+
+      <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:8px;overflow:hidden;margin:10px 0;">
+        <div style="display:grid;grid-template-columns:130px 1fr;font-size:13px;">
+          <div style="padding:10px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Zona horaria</div>
+          <div style="padding:10px 14px;color:#e2e8f0;border-bottom:1px solid #262d3f;">Tu zona horaria, ej: <code>America/Bogota</code></div>
+          <div style="padding:10px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Profesionales</div>
+          <div style="padding:10px 14px;color:#e2e8f0;border-bottom:1px solid #262d3f;">Un profesional por línea:<br><span style="font-family:'DM Mono',monospace;font-size:12px;color:#38e8c5;">Nombre Profesional | calendarId</span></div>
+          <div style="padding:10px 14px;background:#1c2030;color:#6b7a99;">Servicios</div>
+          <div style="padding:10px 14px;color:#e2e8f0;">Separados por barra vertical:<br><span style="font-family:'DM Mono',monospace;font-size:12px;color:#38e8c5;">Asesoría | Divorcios | Derecho laboral</span></div>
+        </div>
+      </div>
+
+      <ul>
+        <li>Haz clic en <code>Submit</code> → espera los nodos en verde</li>
+        <li>Abre el nodo <code>Convertir código</code> → descarga <code>Código Organizar info</code> como <code>.txt</code> → copia todo el contenido</li>
+        <li>Vuelve al flujo <strong>Reprogramar cita</strong> → abre el nodo <code>Organizar info</code> → borra el código por defecto → pega el código generado → cierra el nodo</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="34">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">34</span>
+      <span class="step-title">Configurar el nodo "Registrar datos" en Reprogramar cita</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>Abre el nodo <code>Registrar datos</code> con doble clic</li>
+        <li>Selecciona la credencial de <strong>Google Sheets</strong> ya creada</li>
+        <li>En <code>Document</code>: selecciona <strong>CRM</strong></li>
+        <li>En <code>Sheet</code>: selecciona <strong>Registro de citas</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>En <code>Mapping Column Mode</code>: selecciona <strong>Map each column manually</strong></li>
+        <li>Aparecerán 5 campos. Pega cada valor así:</li>
+      </ul>
+
+      <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:8px;overflow:hidden;margin:10px 0;">
+        <div style="display:grid;grid-template-columns:120px 1fr;font-family:'DM Mono',monospace;font-size:11.5px;">
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">ID</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $json.id }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Fecha cita</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $json.fecha_cita }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Hora</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $json.hora }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">Profesional</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{ $json.profesional }}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;">Estado</div>
+          <div style="padding:9px 14px;color:#38e8c5;user-select:all;">{{ "Reagendada (" + $now.setZone("America/Bogota").toFormat("dd/LL/yyyy y HH:mm") + ")" }}</div>
+        </div>
+      </div>
+      <div class="tip"><strong>⚠️ Recuerda:</strong> En el campo Estado, cambia <code>America/Bogota</code> por la zona horaria de tu país si es diferente.</div>
+
+      <ul style="margin-top:10px;">
+        <li>Cierra el nodo → haz clic en <code>Save</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="35">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">35</span>
+      <span class="step-title">Conectar "Reprogramar cita" al flujo padre</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>En el <strong>flujo padre</strong> → doble clic en la tool <code>Reprogramar cita</code></li>
+        <li>En <code>Workflow</code> selecciona <strong>Reprogramar cita</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>Aparecerán los inputs: <strong>StartTime, EndTime, Event ID, Calendar ID y Profesional</strong></li>
+        <li>Haz clic en las <strong>tres estrellas ✨</strong> en cada campo → todos deben quedar con <code>Defined automatically by the model</code></li>
+      </ul>
+      <div class="tip"><strong>✅ Listo:</strong> Flujo hijo Reprogramar cita conectado. Ahora sigue con <strong>Eliminar cita</strong>.</div>
+    </div>
+  </div>
+
+  <!-- ═══ FASE 12: ELIMINAR CITA ═══ -->
+  <div class="phase phase-n8n">
+    <div class="phase-dot"></div>
+    <h2>Fase 12 — Flujo hijo: Eliminar cita</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="36">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">36</span>
+      <span class="step-title">Descargar e importar el flujo "Eliminar cita"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>Ve a Skool → módulo <strong>Flujos hijos</strong> → <code>Resources</code> → descarga <strong>Eliminar cita</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo con <code>Import from file</code></li>
+      </ul>
+      <p>En este flujo configurarás <strong>dos nodos</strong>: Eliminar cita y Registrar info.</p>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="37">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">37</span>
+      <span class="step-title">Configurar los nodos "Eliminar cita" y "Registrar info"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p><strong>Nodo 1 — Eliminar cita:</strong></p>
+      <ul>
+        <li>Abre el nodo <code>Eliminar cita</code> con doble clic</li>
+        <li>En <code>Credentials to connect with</code>: selecciona la credencial de <strong>Google Calendar</strong> ya creada</li>
+        <li>No toques nada más → cierra el nodo</li>
+      </ul>
+
+      <p style="margin-top:14px;"><strong>Nodo 2 — Registrar info:</strong></p>
+      <ul>
+        <li>Abre el nodo <code>Registrar info</code> con doble clic</li>
+        <li>Selecciona la credencial de <strong>Google Sheets</strong> ya creada</li>
+        <li>En <code>Document</code>: selecciona <strong>CRM</strong></li>
+        <li>En <code>Sheet</code>: selecciona <strong>Registro de citas</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>En <code>Mapping Column Mode</code>: selecciona <strong>Map each column manually</strong></li>
+        <li>Aparecerán 2 campos. Pega cada valor así:</li>
+      </ul>
+
+      <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:8px;overflow:hidden;margin:10px 0;">
+        <div style="display:grid;grid-template-columns:80px 1fr;font-family:'DM Mono',monospace;font-size:11.5px;">
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;border-bottom:1px solid #262d3f;">ID</div>
+          <div style="padding:9px 14px;color:#38e8c5;border-bottom:1px solid #262d3f;user-select:all;">{{$node["When Executed by Another Workflow"].json.eventID}}</div>
+          <div style="padding:9px 14px;background:#1c2030;color:#6b7a99;">Estado</div>
+          <div style="padding:9px 14px;color:#38e8c5;user-select:all;">{{ "Cancelada (" + $now.setZone("America/Bogota").toFormat("dd/LL/yyyy y HH:mm") + ")" }}</div>
+        </div>
+      </div>
+      <div class="tip"><strong>⚠️ Recuerda:</strong> En el campo Estado, cambia <code>America/Bogota</code> por la zona horaria de tu país si es diferente.</div>
+
+      <ul style="margin-top:10px;">
+        <li>Cierra el nodo → haz clic en <code>Save</code></li>
+      </ul>
+    </div>
+  </div>
+
+
+  <div class="step-card" data-id="38">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">38</span>
+      <span class="step-title">Conectar "Eliminar cita" al flujo padre</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>En el <strong>flujo padre</strong> → doble clic en la tool <code>Eliminar cita</code></li>
+        <li>En <code>Workflow</code> selecciona <strong>Eliminar cita</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>Aparecerán 3 inputs: <strong>Event ID, Calendar ID e ID</strong></li>
+        <li>Haz clic en las <strong>tres estrellas ✨</strong> en cada campo → todos deben quedar con <code>Defined automatically by the model</code></li>
+      </ul>
+      <div class="tip"><strong>✅ Listo:</strong> Flujo hijo Eliminar cita conectado. Ahora sigue con <strong>Resolver fecha relativa</strong>.</div>
+    </div>
+  </div>
+
+  <!-- ═══ FASE 13: RESOLVER FECHA RELATIVA ═══ -->
+  <div class="phase phase-vapi">
+    <div class="phase-dot"></div>
+    <h2>Fase 13 — Flujo hijo: Resolver fecha relativa</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="39">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">39</span>
+      <span class="step-title">Descargar, importar y configurar "Resolver fecha relativa"</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>Ve a Skool → módulo <strong>Flujos hijos</strong> → <code>Resources</code> → descarga <strong>Resolver fecha relativa</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo con <code>Import from file</code></li>
+        <li>Abre el nodo <code>Resolver fecha</code> con doble clic</li>
+        <li>Dentro del código busca esta línea:</li>
+      </ul>
+      <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:7px;padding:10px 14px;margin:10px 0;font-family:'DM Mono',monospace;font-size:13px;color:#38e8c5;user-select:all;">const TZ = "America/Bogota";</div>
+      <ul>
+        <li>Si tu país es diferente, reemplaza <code>America/Bogota</code> por tu zona horaria</li>
+        <li>Cierra el nodo → haz clic en <code>Save</code></li>
+      </ul>
+      <div class="tip"><strong>💡 Tip:</strong> Si no sabes tu zona horaria, ve a Skool → módulo <strong>Zonas horarias – Guía rápida</strong> y cópiala tal cual.</div>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="40">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">40</span>
+      <span class="step-title">Conectar "Resolver fecha relativa" al flujo padre</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>En el <strong>flujo padre</strong> → doble clic en la tool <code>Resolver fecha relativa</code></li>
+        <li>En <code>Workflow</code> selecciona <strong>Resolver fecha relativa</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>En <code>Workflow Inputs</code> aparecerá un solo campo: <strong>Text</strong></li>
+        <li>Haz clic en las <strong>tres estrellas ✨</strong> → debe quedar <code>Defined automatically by the model</code></li>
+      </ul>
+      <div class="tip"><strong>✅ Listo:</strong> Flujo hijo Resolver fecha relativa conectado. Última tool: <strong>Normalizar email</strong>.</div>
+    </div>
+  </div>
+
+  <!-- ═══ FASE 14: NORMALIZAR EMAIL ═══ -->
+  <div class="phase phase-tools">
+    <div class="phase-dot"></div>
+    <h2>Fase 14 — Flujo hijo: Normalizar email</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="41">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">41</span>
+      <span class="step-title">Descargar e importar "Normalizar email" — sin configuración</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>Ve a Skool → módulo <strong>Flujos hijos</strong> → <code>Resources</code> → descarga <strong>Normalizar email</strong></li>
+        <li>En n8n → crea un workflow nuevo → impórtalo con <code>Import from file</code></li>
+        <li>Este flujo <strong>ya viene listo</strong>, no necesitas configurar nada</li>
+        <li>Haz clic en <code>Save</code> directamente</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="step-card" data-id="42">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">42</span>
+      <span class="step-title">Conectar "Normalizar email" al flujo padre y activar producción</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <ul>
+        <li>En el <strong>flujo padre</strong> → doble clic en la tool <code>Normalizar email</code></li>
+        <li>En <code>Workflow</code> selecciona <strong>Normalizar email</strong> (si aparece dos veces, selecciónalo de nuevo)</li>
+        <li>En <code>Workflow Inputs</code> aparecerá un solo campo: <strong>Email</strong></li>
+        <li>Haz clic en las <strong>tres estrellas ✨</strong> → debe quedar <code>Defined automatically by the model</code></li>
+        <li>Cierra la tool → haz clic en <code>Save</code></li>
+        <li>Asegúrate de que el flujo padre esté <strong>activo</strong> (modo producción)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ═══ FASE 15: PRUEBAS FINALES ═══ -->
+  <div class="phase phase-sheets">
+    <div class="phase-dot"></div>
+    <h2>Fase 15 — ¡A probar el agente!</h2>
+    <div class="phase-line"></div>
+  </div>
+
+  <div class="step-card" data-id="43">
+    <div class="step-header">
+      <div class="check-box">
+        <svg width="12" height="10" viewBox="0 0 12 10" fill="none"><path d="M1 5L4.5 8.5L11 1" stroke="#0d0f14" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span class="step-num">43</span>
+      <span class="step-title">Probar el agente en VAPI — llamada de prueba</span>
+      <svg class="chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="step-body">
+      <p>¡Todo está conectado! Hora de verificar que funcione de punta a punta.</p>
+      <ul>
+        <li>Ve a <strong>VAPI</strong> → abre tu asistente de reservas</li>
+        <li>Haz clic en <code>Talk to Assistant</code> para iniciar la conversación</li>
+        <li>Prueba cada función del agente:</li>
+      </ul>
+      <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:8px;overflow:hidden;margin:10px 0;">
+        <div style="display:grid;grid-template-columns:28px 1fr;font-size:13px;">
+          <div style="padding:10px 4px 10px 14px;border-bottom:1px solid #262d3f;">📅</div>
+          <div style="padding:10px 14px;color:#e2e8f0;border-bottom:1px solid #262d3f;"><strong>Agendar una cita</strong> — verifica que se cree en Google Calendar y quede en el CRM</div>
+          <div style="padding:10px 4px 10px 14px;border-bottom:1px solid #262d3f;">🔄</div>
+          <div style="padding:10px 14px;color:#e2e8f0;border-bottom:1px solid #262d3f;"><strong>Reprogramar la cita</strong> — verifica que se actualice la fecha en Calendar y en el CRM</div>
+          <div style="padding:10px 4px 10px 14px;border-bottom:1px solid #262d3f;">🔍</div>
+          <div style="padding:10px 14px;color:#e2e8f0;border-bottom:1px solid #262d3f;"><strong>Buscar citas</strong> — verifica que el agente encuentre la cita correctamente</div>
+          <div style="padding:10px 4px 10px 14px;">❌</div>
+          <div style="padding:10px 14px;color:#e2e8f0;"><strong>Cancelar la cita</strong> — verifica que se elimine de Calendar y el estado quede como "Cancelada" en el CRM</div>
+        </div>
+      </div>
+      <div class="tip"><strong>🎉 ¡Felicitaciones!</strong> Si todo funciona, tu agente de reservas está 100% operativo y listo para atender clientes reales.</div>
+    </div>
+  </div>
+
+  <!-- DONE BANNER -->
+  <div id="done-banner">
+    <div class="emoji">🎉</div>
+    <h3>¡Agente 100% configurado!</h3>
+    <p>Completaste los 43 pasos. Tu agente de reservas está listo para atender llamadas, agendar, reprogramar, buscar y cancelar citas automáticamente. ¡A producción!</p>
+  </div>
+
+  <button class="reset-btn">↺ Reiniciar progreso</button>
+
+</main>
+
+<script>
+  var TOTAL = 43;
+
+  function getState() {
+    try { var s = localStorage.getItem('agente_progress'); return s ? JSON.parse(s) : {}; }
+    catch(e) { return {}; }
+  }
+
+  function saveState(state) {
+    try { localStorage.setItem('agente_progress', JSON.stringify(state)); } catch(e) {}
+  }
+
+  function updateProgress() {
+    var state = getState();
+    var done = Object.keys(state).filter(function(k){ return state[k]; }).length;
+    var pct = Math.round((done / TOTAL) * 100);
+    document.getElementById('bar').style.width = pct + '%';
+    document.getElementById('pct').textContent = pct + '%';
+    document.getElementById('done-banner').style.display = (done === TOTAL) ? 'block' : 'none';
+  }
+
+  function restoreState() {
+    var state = getState();
+    document.querySelectorAll('.step-card').forEach(function(card) {
+      if (state[card.dataset.id]) {
+        card.classList.add('completed');
+        card.querySelector('.check-box').classList.add('checked');
+      }
+    });
+    updateProgress();
+  }
+
+  // Event delegation - no onclick attributes needed
+  document.addEventListener('click', function(e) {
+    // Handle checkbox click
+    var box = e.target.closest('.check-box');
+    if (box) {
+      e.stopPropagation();
+      var card = box.closest('.step-card');
+      var id = card.dataset.id;
+      var state = getState();
+      var isChecked = box.classList.toggle('checked');
+      card.classList.toggle('completed', isChecked);
+      state[id] = isChecked;
+      saveState(state);
+      updateProgress();
+      return;
+    }
+
+    // Handle step header click (toggle open/close)
+    var header = e.target.closest('.step-header');
+    if (header) {
+      var card = header.closest('.step-card');
+      var isOpen = card.classList.contains('open');
+      document.querySelectorAll('.step-card.open').forEach(function(c) { c.classList.remove('open'); });
+      if (!isOpen) card.classList.add('open');
+      return;
+    }
+
+    // Handle reset button
+    if (e.target.closest('.reset-btn')) {
+      if (!confirm('¿Seguro que quieres reiniciar todo el progreso?')) return;
+      try { localStorage.removeItem('agente_progress'); } catch(e) {}
+      document.querySelectorAll('.step-card').forEach(function(c) {
+        c.classList.remove('completed', 'open');
+        c.querySelector('.check-box').classList.remove('checked');
+      });
+      updateProgress();
+    }
+  });
+
+  restoreState();
+</script>
+</body>
+</html>
