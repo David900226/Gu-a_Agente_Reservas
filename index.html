@@ -528,9 +528,9 @@
       <p>Le vamos a dar una voz en español a tu agente:</p>
       <ul>
         <li>En VAPI, selecciona la pestaña <code>Voice</code> en el menú superior</li>
-        <li>En <strong>Voice Configuration</strong> → <code>Provider</code>: selecciona <strong>VAPI</strong></li>
+        <li>En <strong>Voice Configuration</strong> → <code>Provider</code>: selecciona <strong>ElevenLabs</strong></li>
         <li>Activa la opción <code>Add Voice ID manually</code></li>
-        <li>Busca en Google la <strong>plataforma de voces</strong> → entra a la página oficial</li>
+        <li>Abre una pestaña nueva → ve directamente a <strong>ElevenLabs</strong> (elevenlabs.io) → entra a la página oficial</li>
         <li>En el menú izquierdo → <code>Voces</code> → filtra por idioma → <code>Spanish</code></li>
         <li>Encuentra una voz que te guste → haz clic en los tres puntos → <code>Copiar ID de voz</code></li>
         <li>Regresa a VAPI y pega el ID en <code>Custom Voice ID</code></li>
@@ -756,20 +756,8 @@
         <li>En <code>Sheet</code>: selecciona la pestaña <strong>Clientes</strong></li>
       </ul>
 
-      <div style="background:rgba(251,113,133,0.08);border:1px solid rgba(251,113,133,0.3);border-left:3px solid #fb7185;border-radius:8px;padding:14px 16px;margin-top:14px;">
-        <p style="color:#fb7185;font-weight:600;font-family:'Syne',sans-serif;font-size:13px;margin-bottom:8px;">🚨 Error conocido — "Error fetching options from Google Sheets"</p>
-        <p style="color:#c4a0a8;font-size:13px;margin-bottom:10px;">Es normal que en el campo <strong>Column</strong> (dentro de Filters) aparezca este error. No te preocupes, tiene solución fácil:</p>
-        <ul style="margin:0;">
-          <li style="font-size:13px;color:#c4a0a8;">Elimina el filtro que tiene el error haciendo clic en el ícono de basura o X que aparece al lado</li>
-          <li style="font-size:13px;color:#c4a0a8;">Haz clic en <code>Add Filter</code> para crear uno nuevo</li>
-          <li style="font-size:13px;color:#c4a0a8;">En <strong>Column</strong> selecciona <code>email</code> de la lista desplegable</li>
-          <li style="font-size:13px;color:#c4a0a8;">En <strong>Value</strong> pega exactamente este valor:</li>
-        </ul>
-        <div style="background:#0d0f14;border:1px solid #262d3f;border-radius:7px;padding:10px 14px;margin-top:10px;font-family:'DM Mono',monospace;font-size:13px;color:#38e8c5;letter-spacing:0.3px;user-select:all;">
-          &#123;&#123; $json.email_norm &#125;&#125;
-        </div>
-        <p style="color:#7a8a6a;font-size:12px;margin-top:8px;">💡 Puedes seleccionar y copiar el texto de arriba directamente.</p>
-      </div>
+      <div class="tip"><strong>✅ Credencial conectada.</strong> En el siguiente paso configuramos el filtro de búsqueda para que funcione correctamente.</div>
+      
     </div>
   </div>
 
